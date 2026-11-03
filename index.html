@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#080b08">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="钢铁围城 STEEL SIEGE — 一款纯 HTML5 Canvas 制作的俯视角坦克生存街机游戏。">
+  <title>钢铁围城 · STEEL SIEGE</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-state="menu" data-touch="false">
+  <main class="game-frame" id="gameFrame">
+    <canvas id="gameCanvas" aria-label="钢铁围城游戏画面"></canvas>
+
+    <div class="screen-fx fx-vignette" aria-hidden="true"></div>
+    <div class="screen-fx fx-scanlines" aria-hidden="true"></div>
+    <div class="screen-fx fx-grain" aria-hidden="true"></div>
+    <div class="screen-fx fx-damage" id="damageFlash" aria-hidden="true"></div>
+    <div class="screen-fx fx-low-health" id="lowHealthFx" aria-hidden="true"></div>
+
+    <header class="hud" id="hud">
+      <div class="hud-brand">
+        <span class="hud-emblem" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none">
+            <path d="M5 11h22v13H5z" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M9 7h14v4H9zM16 11v4M12 24v4M20 24v4" stroke="currentColor" stroke-width="1.5"/>
+            <circle cx="16" cy="17" r="3.2" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+        </span>
+        <div class="hud-title">
+          <strong>STEEL SIEGE</strong>
+          <span>钢铁围城</span>
+        </div>
+      </div>
+
+      <div class="wave-readout" aria-live="polite">
+        <span class="hud-label">WAVE / 波次</span>
+        <div class="wave-line">
+          <b id="waveValue">01</b>
+          <span class="wave-divider">//</span>
+          <span id="enemyCount">0 HOSTILES</span>
+        </div>
+      </div>
+
+      <div class="hud-actions">
+        <div class="score-readout">
+          <span class="hud-label">SCORE / 得分</span>
+          <b id="scoreValue">000000</b>
+        </div>
+        <button class="icon-button js-sound-toggle" type="button" aria-label="静音" title="声音（M）">
+          <svg class="icon-sound-on" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          <svg class="icon-sound-off" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="m16.5 9 5 5m0-5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button class="icon-button" id="pauseButton" type="button" aria-label="暂停游戏" title="暂停（P）">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M8 6v12M16 6v12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="boss-hud" id="bossHud" aria-hidden="true">
+      <div class="boss-meta">
+        <span><i class="warning-pip"></i> HEAVY UNIT / 重装单位</span>
+        <span id="bossHpText">100%</span>
+      </div>
+      <div class="boss-track"><span id="bossBar"></span></div>
+      <div class="boss-name" id="bossName">TITAN-CLASS “IRON JAW”</div>
+    </div>
+
+    <div class="combo-hud" id="comboHud" aria-hidden="true">
+      <span class="combo-kicker">KILL CHAIN</span>
+      <strong id="comboValue">×1.0</strong>
+      <span class="combo-rule"><i id="comboTimer"></i></span>
+    </div>
+
+    <section class="status-dock" aria-label="玩家状态">
+      <div class="status-card">
+        <div class="status-heading">
+          <span>HULL / 装甲完整度</span>
+          <b id="hpText">100</b>
+        </div>
+        <div class="health-track">
+          <div class="health-fill" id="healthBar"></div>
+          <div class="health-ticks" aria-hidden="true"></div>
+        </div>
+        <div class="shield-track"><span id="shieldBar"></span></div>
+        <div class="ability-row">
+          <div class="dash-meter" id="dashMeter">
+            <span>SHIFT / 冲刺</span>
+            <i><em id="dashBar"></em></i>
+          </div>
+          <span class="buff-label" id="buffLabel">SYSTEMS NOMINAL</span>
+        </div>
+      </div>
+      <div class="controls-legend" id="controlsLegend">
+        <span><kbd>WASD</kbd> 移动</span>
+        <span><kbd>鼠标</kbd> 瞄准</span>
+        <span><kbd>左键</kbd> 开火</span>
+        <span><kbd>SHIFT</kbd> 冲刺</span>
+      </div>
+    </section>
+
+    <div class="wave-banner" id="waveBanner" aria-live="polite">
+      <span class="banner-kicker" id="bannerKicker">INCOMING</span>
+      <strong id="bannerTitle">WAVE 01</strong>
+      <span class="banner-sub" id="bannerSub">敌方装甲单位正在接近</span>
+    </div>
+
+    <div class="start-hint" id="startHint">
+      <span><kbd>WASD</kbd> 机动</span>
+      <span class="hint-dot"></span>
+      <span><kbd>左键</kbd> 瞄准射击</span>
+      <span class="hint-dot"></span>
+      <span><kbd>SHIFT</kbd> 紧急冲刺</span>
+    </div>
+
+    <div class="touch-controls" id="touchControls">
+      <div class="stick-wrap">
+        <div class="stick-zone" id="moveStick" role="group" aria-label="移动摇杆">
+          <div class="stick-base">
+            <span class="stick-axis stick-axis-x"></span>
+            <span class="stick-axis stick-axis-y"></span>
+            <span class="stick-knob"></span>
+          </div>
+        </div>
+        <span class="stick-label">MOVE / 移动</span>
+      </div>
+
+      <button class="dash-button" id="touchDash" type="button" aria-label="紧急冲刺">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M13 2 5 14h6l-1 8 9-13h-6V2Z" fill="currentColor"/>
+        </svg>
+        <span id="touchDashLabel">就绪</span>
+      </button>
+
+      <div class="stick-wrap">
+        <div class="stick-zone" id="aimStick" role="group" aria-label="瞄准并开火摇杆">
+          <div class="stick-base">
+            <span class="stick-axis stick-axis-x"></span>
+            <span class="stick-axis stick-axis-y"></span>
+            <span class="stick-knob"></span>
+          </div>
+        </div>
+        <span class="stick-label">AIM / FIRE</span>
+      </div>
+    </div>
+
+    <section class="overlay overlay-menu is-active" id="menuScreen" aria-labelledby="gameTitle">
+      <div class="menu-topbar">
+        <span class="system-status"><i></i> SYSTEM ONLINE <em>·</em> SECTOR 07</span>
+        <button class="icon-button js-sound-toggle" type="button" aria-label="静音" title="声音（M）">
+          <svg class="icon-sound-on" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          <svg class="icon-sound-off" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="m16.5 9 5 5m0-5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="menu-main">
+        <p class="eyebrow"><span></span> SOLO OPERATION / 独立行动</p>
+        <h1 class="game-title" id="gameTitle">
+          <span class="title-steel">STEEL</span>
+          <span class="title-siege">SIEGE</span>
+        </h1>
+        <div class="cn-lockup"><i></i><span>钢 铁 围 城</span><i></i></div>
+        <p class="lede">敌方装甲集群正在越过灰烬盆地。<br>驾驶「灰烬号」守住阵地，活到最后一波。</p>
+
+        <div class="menu-actions">
+          <button class="primary-button" id="startButton" type="button">
+            <span class="button-index">01</span>
+            <span>开始部署<small>DEPLOY</small></span>
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <p class="enter-hint">按 <kbd>ENTER</kbd> 快速开始</p>
+        </div>
+
+        <div class="menu-stats">
+          <div class="menu-stat">
+            <span>最高得分 / BEST SCORE</span>
+            <b id="bestScoreMenu">000000</b>
+          </div>
+          <div class="menu-stat">
+            <span>最高波次 / BEST WAVE</span>
+            <b id="bestWaveMenu">--</b>
+          </div>
+          <div class="menu-stat menu-stat-build">
+            <span>战区 / SECTOR</span>
+            <b>07</b>
+          </div>
+        </div>
+      </div>
+
+      <aside class="briefing" aria-label="操作说明">
+        <header>
+          <span>战术手册</span>
+          <small>FIELD MANUAL // 01</small>
+        </header>
+        <div class="brief-row">
+          <span class="brief-icon">✛</span>
+          <div><kbd>W A S D</kbd><small>方向键</small></div>
+          <p>推进 / 机动</p>
+        </div>
+        <div class="brief-row">
+          <span class="brief-icon">◎</span>
+          <div><kbd>MOUSE</kbd><small>鼠标</small></div>
+          <p>转动炮塔 / 瞄准</p>
+        </div>
+        <div class="brief-row">
+          <span class="brief-icon">▸</span>
+          <div><kbd>LMB</kbd><small>左键 / 空格</small></div>
+          <p>开火</p>
+        </div>
+        <div class="brief-row">
+          <span class="brief-icon">≫</span>
+          <div><kbd>SHIFT</kbd><small>冲刺</small></div>
+          <p>紧急闪避</p>
+        </div>
+        <p class="brief-tip"><i>!</i> 利用掩体阻断敌方火力。摧毁木箱，可能掉落维修、护盾或过载补给。</p>
+      </aside>
+
+      <footer class="menu-footer">
+        <span>ASH BASIN · EASTERN FRONT</span>
+        <span class="menu-coordinates">N 34°07' / E 118°21'</span>
+        <span>BUILD 1.0 / HTML5</span>
+      </footer>
+    </section>
+
+    <section class="overlay overlay-pause" id="pauseScreen" aria-labelledby="pauseTitle">
+      <div class="modal-card pause-card">
+        <div class="modal-topline">
+          <span>TACTICAL HOLD</span>
+          <button class="icon-button js-sound-toggle" type="button" aria-label="静音" title="声音（M）">
+            <svg class="icon-sound-on" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+              <path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            <svg class="icon-sound-off" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+              <path d="m16.5 9 5 5m0-5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <p class="eyebrow"><span></span> PAUSED / 暂停</p>
+        <h2 id="pauseTitle">战术暂停</h2>
+        <p class="modal-copy">引擎待命。调整呼吸，检查装甲，然后重返战场。</p>
+        <div class="pause-stats">
+          <div><span>当前波次</span><b>WAVE <em id="pauseWave">01</em></b></div>
+          <div><span>战场得分</span><b id="pauseScore">000000</b></div>
+        </div>
+        <div class="modal-actions">
+          <button class="primary-button compact" id="resumeButton" type="button">
+            <span>继续战斗<small>RESUME</small></span>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg>
+          </button>
+          <button class="ghost-button" id="pauseRestartButton" type="button">重新部署</button>
+          <button class="ghost-button" id="pauseMenuButton" type="button">返回主菜单</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="overlay overlay-gameover" id="gameOverScreen" aria-labelledby="gameOverTitle">
+      <div class="modal-card gameover-card">
+        <p class="record-tag" id="recordTag">NEW FIELD RECORD</p>
+        <p class="eyebrow eyebrow-danger"><span></span> SIGNAL LOST / 信号中断</p>
+        <h2 id="gameOverTitle">战线失守</h2>
+        <p class="modal-copy">灰烬号装甲信号中断。<br>但每一次沉没，都会让下一次反击更加锋利。</p>
+        <div class="result-grid">
+          <div class="result-main">
+            <span>最终得分 / FINAL SCORE</span>
+            <b id="finalScore">000000</b>
+          </div>
+          <div><span>抵达波次</span><b id="finalWave">01</b></div>
+          <div><span>击毁单位</span><b id="finalKills">0</b></div>
+          <div><span>最高连杀</span><b id="finalCombo">0</b></div>
+          <div><span>历史最佳</span><b id="finalBest">000000</b></div>
+        </div>
+        <div class="modal-actions">
+          <button class="primary-button compact" id="restartButton" type="button">
+            <span>再次出击<small>REDEPLOY</small></span>
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="ghost-button" id="menuButton" type="button">返回主菜单</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="orientation-gate" role="status">
+      <div class="rotate-icon">
+        <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <rect x="16" y="6" width="16" height="27" rx="2" transform="rotate(90 24 20)" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M8 37a16 16 0 0 0 30 2M40 39v-6h-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <p class="eyebrow"><span></span> VIEWPORT LOCKED</p>
+      <h2>请横屏迎战</h2>
+      <p>将设备旋转为横向，以获得完整的战场视野。</p>
+    </div>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
