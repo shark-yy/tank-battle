@@ -33,7 +33,7 @@
 ## 本地运行
 
 ```bash
-git clone <仓库地址>
+git clone https://github.com/shark-yy/tank-battle.git
 cd tank-battle
 ```
 
